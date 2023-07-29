@@ -26,9 +26,9 @@ layout = [[gui.Text("Enter the image you wish to process")],
 			[gui.Text("Name:", pad=((6,4),(1,5))), gui.Input(key='-OUT_NAME-', size=(10,1), expand_x=True, pad=((0,6),(1,5)))],
 			], expand_x=True)],
 		  [gui.Frame("Scaling", [
-		  	[gui.Text("Image Downscale:", pad=((6,4),(1,5))), gui.Combo([1], default_value = 1, key='-SCALE-', enable_events=True, pad=((0,6),(1,5))), gui.Text("Final Size:", key='-SIZE-', pad=((6,4),(1,5)))],
-		    [gui.Text("Scaling Device:", pad=((6,4),(1,5))), gui.Combo([device.name for device in ResizeDevice], key='-SCALE_DEVICE-', pad=((6,4),(1,5)))]
-		    ], expand_x=True)],
+			[gui.Text("Image Downscale:", pad=((6,4),(1,5))), gui.Combo([1], default_value = 1, key='-SCALE-', enable_events=True, pad=((0,6),(1,5))), gui.Text("Final Size:", key='-SIZE-', pad=((6,4),(1,5)))],
+			[gui.Text("Scaling Device:", pad=((6,4),(1,5))), gui.Combo([device.name for device in ResizeDevice], key='-SCALE_DEVICE-', pad=((6,4),(1,5)))]
+			], expand_x=True)],
 		  [gui.Text(size=(40,1), key='-OUTPUT-')],
 		  [gui.Button('Ok'), gui.Button('Quit')]]
 
@@ -73,7 +73,7 @@ def best_fit_column(args):
 			out_img[y][x+1][c][1] = c2
 			out_img[y+1][x][c][2] = c3
 			out_img[y+1][x+1][c][3] = c4
-		print(x, y, out_img[y][x])
+		print(x, y)
 
 def RESIZE_CPU_MULTI(img, scale):
 
@@ -82,7 +82,7 @@ def RESIZE_CPU_MULTI(img, scale):
 
 	out_img = np.full((img.shape[0]//scale, img.shape[1]//scale, img.shape[2], 4), -1, dtype=np.float64)
 
-	print(os.cpu_count())
+	print("Process Count:" + str(os.cpu_count()))
 	with Pool() as pool: # Pool() uses os.cpu_count() i.e. the max amount possible
 		shared_mem_out = shared_memory.SharedMemory(name="shared_out_img", create=True, size=out_img.nbytes)
 		shared_out_img = np.ndarray(out_img.shape, dtype=out_img.dtype, buffer=shared_mem_out.buf)
@@ -97,8 +97,7 @@ def RESIZE_CPU_MULTI(img, scale):
 		shared_mem_img.unlink()
 		shared_mem_out.unlink()
 	
-	out_img = np.uint8(np.squeeze(np.mean(out_img, axis=-1, keepdims=True, where=out_img != -1)[:,:,:,0]))
-	return out_img
+	return out_img # Not a real image yet
 
 def RESIZE_GPU(img, scale):
 	out_img_shape = (img.shape[0]//scale, img.shape[1]//scale, img.shape[2], 4)
@@ -128,11 +127,11 @@ def RESIZE_GPU(img, scale):
 	constraints = np.float32(constraints)
 	constraint_types = np.array([gf.ConstraintType.LOWER_UPPER]*4, dtype=np.int32)
 
-	tolerance = 0.5
+	tolerance = 0.01
 
-	max_number_iterations = 10
+	max_number_iterations = 20
 
-	estimator_id = gf.EstimatorID.MLE
+	estimator_id = gf.EstimatorID.LSE
 
 	model_id = gf.ModelID.BILINEAR
 
@@ -142,12 +141,30 @@ def RESIZE_GPU(img, scale):
 																					tolerance, max_number_iterations, None,
 																					estimator_id, None)
 
+	# print fit results
+	converged = states == 0
+
+	# print summary
+	print('mean chi_square: {:.2f}'.format(np.mean(chi_squares[converged])))
+	print('iterations:      {:.2f}'.format(np.mean(number_iterations[converged])))
+	print('time:            {:.2f} s'.format(execution_time))
+
+	# get fit states
+	number_converged = np.sum(converged)
+	print('\nratio converged         {:6.2f} %'.format(number_converged / number_fits * 100))
+	print('ratio max it. exceeded  {:6.2f} %'.format(np.sum(states == 1) / number_fits * 100))
+
+	# mean, std of fitted parameters
+	converged_parameters = out_img[converged, :]
+	converged_parameters_mean = np.mean(converged_parameters, axis=0)
+	converged_parameters_std = np.std(converged_parameters, axis=0)
+
 	out_img = out_img.reshape((out_img_shape[0]-1, out_img_shape[1]-1, out_img_shape[2], out_img_shape[3]))
 	out_img = np.pad(out_img, ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values = -1)
 
 	for y in range(out_img.shape[0]-1, -1, -1):
-		for x in range(out_img.shape[0]-1, -1, -1):
-			for c in range(2, -1, -1):
+		for x in range(out_img.shape[1]-1, -1, -1):
+			for c in range(out_img.shape[2]-1, -1, -1):
 				if x-1 > 0:
 					out_img[y][x][c][1] = out_img[y][x-1][c][1]
 				else:
@@ -163,7 +180,7 @@ def RESIZE_GPU(img, scale):
 				else:
 					out_img[y][x][c][3] = -1
 
-	return np.uint8(np.squeeze(np.mean(out_img, axis=-1, keepdims=True, where=out_img != -1)[:,:,:,0]))
+	return out_img # Not a real image yet
 
 def best_fit(img, scale, SCALE_DEVICE):
 	out_img = None
@@ -173,7 +190,9 @@ def best_fit(img, scale, SCALE_DEVICE):
 			out_img = RESIZE_CPU_MULTI(img, scale)
 		case ResizeDevice.GPU:
 			out_img = RESIZE_GPU(img, scale)
-	print(out_img, SCALE_DEVICE)
+
+	out_img = np.ma.squeeze(np.ma.median(np.ma.masked_values(out_img, -1), axis=-1, keepdims=True)[:,:,:,0])
+	out_img = np.uint8(np.round(np.ma.getdata(out_img)))
 	return out_img
 
 @njit
