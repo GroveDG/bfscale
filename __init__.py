@@ -1,23 +1,26 @@
-
-# std library
 import os
 from pathlib import Path
-from math import floor, sqrt, log2, ceil
+from math import floor, sqrt
 from multiprocessing import Pool, shared_memory
 from enum import *
 
-from numba import njit, typed, types 			# Optimization through compiling to C
 import numpy as np
-import matplotlib.pyplot as plt 				# Debug img showing
 from imageio.v3 import imread, imwrite, improps # Image IO
 from scipy.optimize import curve_fit			# CPU fitting
-import pygpufit.gpufit as gf 					# GPU fitting (a fun compile-it-yourself project for the whole family!)
-import PySimpleGUI as gui 						# GUI
 
 class ResizeDevice(Enum):
 	CPU_SINGLE = auto()
 	CPU_MULTI = auto()
 	GPU = auto()
+
+available_devices = [ResizeDevice.CPU_SINGLE, ResizeDevice.CPU_MULTI]
+try:
+	import pygpufit.gpufit as gf 					# GPU fitting (a fun compile-it-yourself project for the whole family!)
+	available_devices.append(ResizeDevice.GPU)
+except ImportError:
+	print('Module "gpufit" not found: GPU unavailable')
+
+import PySimpleGUI as gui 						# GUI
 
 # GUI Window Layout
 layout = [[gui.Text("Enter the image you wish to process")],
@@ -27,7 +30,7 @@ layout = [[gui.Text("Enter the image you wish to process")],
 			], expand_x=True)],
 		  [gui.Frame("Scaling", [
 			[gui.Text("Image Downscale:", pad=((6,4),(1,5))), gui.Combo([1], default_value = 1, key='-SCALE-', enable_events=True, pad=((0,6),(1,5))), gui.Text("Final Size:", key='-SIZE-', pad=((6,4),(1,5)))],
-			[gui.Text("Scaling Device:", pad=((6,4),(1,5))), gui.Combo([device.name for device in ResizeDevice], key='-SCALE_DEVICE-', pad=((6,4),(1,5)))]
+			[gui.Text("Scaling Device:", pad=((6,4),(1,5))), gui.Combo([device.name for device in available_devices], key='-SCALE_DEVICE-', pad=((6,4),(1,5)))]
 			], expand_x=True)],
 		  [gui.Text(size=(40,1), key='-OUTPUT-')],
 		  [gui.Button('Ok'), gui.Button('Quit')]]
