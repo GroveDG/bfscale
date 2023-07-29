@@ -204,7 +204,6 @@ def best_fit(img, scale, SCALE_DEVICE):
 	out_img = np.uint8(np.round(np.ma.getdata(out_img)))
 	return out_img
 
-@njit
 def scales_of(size):
 	scales = []
 	for n in range(1, floor(sqrt(size[0]))+1):
