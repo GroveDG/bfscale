@@ -10,7 +10,7 @@ from numba import njit, typed, types 			# Optimization through compiling to C
 import numpy as np
 import matplotlib.pyplot as plt 				# Debug img showing
 from imageio.v3 import imread, imwrite, improps # Image IO
-import symfit as fit 							# CPU fitting
+from scipy.optimize import curve_fit			# CPU fitting
 import pygpufit.gpufit as gf 					# GPU fitting (a fun compile-it-yourself project for the whole family!)
 import PySimpleGUI as gui 						# GUI
 
@@ -32,71 +32,75 @@ layout = [[gui.Text("Enter the image you wish to process")],
 		  [gui.Text(size=(40,1), key='-OUTPUT-')],
 		  [gui.Button('Ok'), gui.Button('Quit')]]
 
-def best_fit_section(model, img_section, xy_indices, z):
-	z[0].value = img_section[0][0]
-	z[1].value = img_section[0][-1]
-	z[2].value = img_section[-1][0]
-	z[3].value = img_section[-1][-1]
+def bilinear(x, c1, c2, c3, c4):
+	return c1*(1-x[1])*(1-x[0]) + c2*x[1]*(1-x[0]) + c3*(1-x[1])*x[0] + c4*x[1]*x[0]
 
-	data_values = np.ravel(img_section)
-
-	to_fit = fit.Fit(model, X=xy_indices[1], Y=xy_indices[0], Z=data_values)
-	
-	fit_result = to_fit.execute(tol=0.5)
-
-	return fit_result.value(z[0]), fit_result.value(z[1]), fit_result.value(z[2]), fit_result.value(z[3])
-
-def best_fit_column(args):
-	y, xy_indices, scale, out_shape, img_shape = args
-
-	X, Y, Z = fit.variables('X, Y, Z') 
-
-	z = (
-			fit.Parameter('c1', min=0, max=255),
-			fit.Parameter('c2', min=0, max=255),
-			fit.Parameter('c3', min=0, max=255),
-			fit.Parameter('c4', min=0, max=255)
-		)
-
-	model = { Z: z[0]*(1-X)*(1-Y) + z[1]*X*(1-Y) + z[2]*(1-X)*Y + z[3]*X*Y }
-
-	shared_mem_out = shared_memory.SharedMemory(name="shared_out_img")
-	out_img = np.ndarray(out_shape, dtype=np.float64, buffer=shared_mem_out.buf)
-
-	shared_mem_img = shared_memory.SharedMemory(name="shared_img")
-	img = np.ndarray(img_shape, dtype=np.uint8, buffer=shared_mem_img.buf)
-
-	for x in range(out_shape[1]-1):
-		for c in range(img_shape[2]):
-			c1, c2, c3, c4 = best_fit_section(model, img[int((y+0.5)*scale):int((y+1.5)*scale), int((x+0.5)*scale):int((x+1.5)*scale), c], xy_indices, z)
-			out_img[y][x][c][0] = c1
-			out_img[y][x+1][c][1] = c2
-			out_img[y+1][x][c][2] = c3
-			out_img[y+1][x+1][c][3] = c4
-		print(x, y)
+def fit_section(args):
+	yx_indices, section, initial_parameters = args
+	params, _ = curve_fit(bilinear, yx_indices, section, p0=initial_parameters, bounds=(0,255))
+	return params
 
 def RESIZE_CPU_MULTI(img, scale):
+	out_img_shape = (img.shape[0]//scale, img.shape[1]//scale, img.shape[2], 4)
 
-	indices = np.float64(np.indices((scale, scale))) / scale
-	xy_indices = [indices[0].ravel(), indices[1].ravel()]
+	number_points = scale ** 2
+	number_fits = (out_img_shape[0]-1) * (out_img_shape[1]-1) * out_img_shape[2]
+	number_parameters = 4
+
+	data = np.zeros((number_fits, number_points), dtype=np.float32)
+	initial_parameters = np.zeros((number_fits, number_parameters), dtype=np.float32)
+	for y in range(out_img_shape[0]-1):
+		y_ind = y * (out_img_shape[1]-1) * out_img_shape[2]
+		for x in range(out_img_shape[1]-1):
+			x_ind = x * out_img_shape[2]
+			for c in range(out_img_shape[2]):
+				ind = y_ind + x_ind + c
+				img_section = img[int((y+0.5)*scale):int((y+1.5)*scale), int((x+0.5)*scale):int((x+1.5)*scale), c]
+				initial_parameters[ind] = np.asarray(
+						[
+						img_section[0][0], img_section[0][-1],
+						img_section[-1][0], img_section[-1][-1]
+						]
+					)
+				data[ind] = img_section.flatten()
+
+	indices = np.linspace(0, 1-1/scale, scale)
+	X, Y = np.meshgrid(indices, indices)
+	size = X.shape
+	x_1d = X.reshape((1, np.prod(size)))
+	y_1d = Y.reshape((1, np.prod(size)))
+
+	yx_indices = np.vstack((y_1d, x_1d))
+
 
 	out_img = np.full((img.shape[0]//scale, img.shape[1]//scale, img.shape[2], 4), -1, dtype=np.float64)
 
 	print("Process Count:" + str(os.cpu_count()))
 	with Pool() as pool: # Pool() uses os.cpu_count() i.e. the max amount possible
-		shared_mem_out = shared_memory.SharedMemory(name="shared_out_img", create=True, size=out_img.nbytes)
-		shared_out_img = np.ndarray(out_img.shape, dtype=out_img.dtype, buffer=shared_mem_out.buf)
-		shared_out_img[:] = out_img[:]
-
-		shared_mem_img = shared_memory.SharedMemory(name="shared_img", create=True, size=img.nbytes)
-		shared_img = np.ndarray(img.shape, dtype=img.dtype, buffer=shared_mem_img.buf)
-		shared_img[:] = img[:]
-
-		pool.map(best_fit_column, [ (y, xy_indices, scale, out_img.shape, img.shape) for y in range(out_img.shape[0]-1) ], (out_img.shape[0]-1)//os.cpu_count())
-		out_img[:] = shared_out_img[:]
-		shared_mem_img.unlink()
-		shared_mem_out.unlink()
+		out_img = pool.map(fit_section, [ (yx_indices, data[ind], initial_parameters[ind]) for ind in range(len(data))], data.shape[0]//os.cpu_count())
 	
+	out_img = np.concatenate(out_img)
+	out_img = out_img.reshape((out_img_shape[0]-1, out_img_shape[1]-1, out_img_shape[2], out_img_shape[3]))
+	out_img = np.pad(out_img, ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values = -1)
+
+	for y in range(out_img.shape[0]-1, -1, -1):
+		for x in range(out_img.shape[1]-1, -1, -1):
+			for c in range(out_img.shape[2]-1, -1, -1):
+				if x-1 > 0:
+					out_img[y][x][c][1] = out_img[y][x-1][c][1]
+				else:
+					out_img[y][x][c][1] = -1
+
+				if y-1 > 0:
+					out_img[y][x][c][2] = out_img[y-1][x][c][2]
+				else:
+					out_img[y][x][c][2] = -1
+
+				if x-1 > 0 and y-1 > 0:
+					out_img[y][x][c][3] = out_img[y-1][x-1][c][3]
+				else:
+					out_img[y][x][c][3] = -1
+
 	return out_img # Not a real image yet
 
 def RESIZE_GPU(img, scale):
@@ -191,7 +195,7 @@ def best_fit(img, scale, SCALE_DEVICE):
 		case ResizeDevice.GPU:
 			out_img = RESIZE_GPU(img, scale)
 
-	out_img = np.ma.squeeze(np.ma.median(np.ma.masked_values(out_img, -1), axis=-1, keepdims=True)[:,:,:,0])
+	out_img = np.ma.median(np.ma.masked_values(out_img, -1), axis=-1)
 	out_img = np.uint8(np.round(np.ma.getdata(out_img)))
 	return out_img
 
