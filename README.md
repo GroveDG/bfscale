@@ -10,6 +10,7 @@ Bfscale was originally developed for improved Signed Distance Fields (SDFs), but
   <li>Numpy</li>
   <li>ImageIO</li>
   <li>Scipy</li>
+  <li>PySimpleGUI</li>
   <li><a href="https://github.com/GroveDG/Gpufit-bfscale">GPUfit fork</a> (optional)</li>
 </ul>
 
