@@ -5,7 +5,7 @@ Best Fit Scale (bfscale) is a image downscaling method to create the highest pos
 Bfscale was originally developed for improved Signed Distance Fields (SDFs), but was separated due to its broader usefulness.
 
 
-# Dependencies
+## Dependencies
 <ul>
   <li>Numpy</li>
   <li>ImageIO</li>
@@ -13,7 +13,7 @@ Bfscale was originally developed for improved Signed Distance Fields (SDFs), but
   <li><a href="https://github.com/GroveDG/Gpufit-bfscale">GPUfit fork</a> (optional)</li>
 </ul>
 
-# Image Comparison
+## Image Comparison
 
 <center>
   <table>
