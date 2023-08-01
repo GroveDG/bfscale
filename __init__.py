@@ -5,11 +5,13 @@ from pathlib import Path
 from math import floor, sqrt
 from multiprocessing import Pool, shared_memory
 from enum import *
+from itertools import tee
+from time import time
 
 import numpy as np
 from imageio.v3 import imread, imwrite, improps # Image IO
 from scipy.optimize import curve_fit			# CPU fitting
-# from numba import njit, prange
+from numba import njit, prange
 
 class ResizeDevice(Enum):
 	CPU_SINGLE = auto()
@@ -38,61 +40,57 @@ layout = [[gui.Text("Enter the image you wish to process")],
 		  [gui.Text(size=(40,1), key='-OUTPUT-')],
 		  [gui.Button('Ok'), gui.Button('Quit')]]
 
-def RESIZE_CPU(img, scale, SCALE_DEVICE):
-	out_img_shape = (img.shape[0]//scale, img.shape[1]//scale, img.shape[2], 4)
+# Better when parallelization is not available (and it's prettier)
+# def flatten_data(data, out_img_shape, img, scale):
+# 	out_img_size = out_img_shape[0] * out_img_shape[1] * out_img_shape[2]
+# 	for ind, coord in enumerate(np.ndindex(out_img_shape[0:3])):
+# 		data[ind] = img[
+# 			int((coord[0]+0.5)*scale):int((coord[0]+1.5)*scale),
+# 			int((coord[1]+0.5)*scale):int((coord[1]+1.5)*scale),
+# 			coord[2]
+# 		].flatten()
+# 	return data.transpose()
 
-	number_points = scale ** 2
-	number_fits = (out_img_shape[0]-1) * (out_img_shape[1]-1) * out_img_shape[2]
-	number_parameters = 4
-
-	data = np.zeros((number_fits, number_points), dtype=np.float32)
-	initial_parameters = np.zeros((number_fits, number_parameters), dtype=np.float32)
-	
-	for y in range(out_img_shape[0]-1):
-		y_ind = y * (out_img_shape[1]-1) * out_img_shape[2]
-		for x in range(out_img_shape[1]-1):
+@njit(parallel=True)
+def flatten_data(data, out_img_shape, img, scale):
+	for y in prange(out_img_shape[0]):
+		y_ind = y * out_img_shape[1] * out_img_shape[2]
+		for x in prange(out_img_shape[1]):
 			x_ind = x * out_img_shape[2]
-			for c in range(out_img_shape[2]):
+			for c in prange(out_img_shape[2]):
 				ind = y_ind + x_ind + c
 				img_section = img[int((y+0.5)*scale):int((y+1.5)*scale), int((x+0.5)*scale):int((x+1.5)*scale), c]
-				data[ind] = img_section.flatten()
+				data[ind] = img_section.flat
+	return data.transpose()
 
-	data = data.transpose()
+def RESIZE_CPU(img, scale, SCALE_DEVICE):
+	out_img_shape = (img.shape[0]//scale-1, img.shape[1]//scale-1, img.shape[2], 4)
 
-	indices = np.linspace(0, 1-1/scale, scale)
-	X, Y = np.meshgrid(indices, indices)
-	size = X.shape
-	X = X.flatten()
-	Y = Y.flatten()
+	data = np.zeros((out_img_shape[0] * out_img_shape[1] * out_img_shape[2], scale ** 2), dtype=np.float32) # Shape: (number of fits, number of points)
+	data = flatten_data(data, out_img_shape, img, scale)
+
+	indicies = np.linspace(0, scale, scale+1)[0:-1]
+	X = np.tile(indicies, scale)
+	Y = np.repeat(indicies, scale)
 
 	yx_indices = np.column_stack(((1-Y)*(1-X), (1-X)*Y, X*(1-Y), X*Y))
 
-	out_img = np.full((img.shape[0]//scale, img.shape[1]//scale, img.shape[2], 4), -1, dtype=np.float64)
+	parameters, _, _, _ = np.linalg.lstsq(yx_indices, data, rcond=None)
 
-	out_img, _, _, _ = np.linalg.lstsq(yx_indices, data, rcond=None)
-	np.clip(out_img, 0, 255, out=out_img)
-	out_img = out_img.transpose()
-	
-	out_img = out_img.reshape((out_img_shape[0]-1, out_img_shape[1]-1, out_img_shape[2], out_img_shape[3]))
-	out_img = np.pad(out_img, ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values = -1)
+	out_img = np.pad(np.clip(parameters, 0, 255).transpose().reshape(out_img_shape), ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values=-1)
+	# This ↓↓↓ is what this line ↑↑↑ is doing
+	# ---------------------------------------
+	# out_img = np.clip(parameters, 0, 255)
+	# out_img = out_img.transpose()
+	# out_img = out_img.reshape(out_img_shape)
+	# out_img = np.pad(out_img, ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values=-1)
 
-	for y in range(out_img.shape[0]-1, -1, -1):
-		for x in range(out_img.shape[1]-1, -1, -1):
-			for c in range(out_img.shape[2]-1, -1, -1):
-				if x-1 > 0:
-					out_img[y][x][c][1] = out_img[y][x-1][c][1]
-				else:
-					out_img[y][x][c][1] = -1
-
-				if y-1 > 0:
-					out_img[y][x][c][2] = out_img[y-1][x][c][2]
-				else:
-					out_img[y][x][c][2] = -1
-
-				if x-1 > 0 and y-1 > 0:
-					out_img[y][x][c][3] = out_img[y-1][x-1][c][3]
-				else:
-					out_img[y][x][c][3] = -1
+	out_img[:, 1:, :, 1] = out_img[:, :-1, :, 1]
+	out_img[1:, :, :, 2] = out_img[:-1, :, :, 2]
+	out_img[1:, 1:, :, 3] = out_img[:-1, :-1, :, 3]
+	out_img[:, 0, :, 1] = -1
+	out_img[0, :, :, 2] = -1
+	out_img[0, 0, :, 3] = -1
 
 	return out_img # Not a real image yet
 
