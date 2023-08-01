@@ -3,14 +3,10 @@
 import os
 from pathlib import Path
 from math import floor, sqrt
-from multiprocessing import Pool, shared_memory
 from enum import *
-from itertools import tee
-from time import time
 
 import numpy as np
 from imageio.v3 import imread, imwrite, improps # Image IO
-from scipy.optimize import curve_fit			# CPU fitting
 from numba import njit, prange
 
 class ResizeDevice(Enum):
