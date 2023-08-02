@@ -26,3 +26,8 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/GroveDG/bfscale"
 "Bug Tracker" = "https://github.com/GroveDG/bfscale/issues"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
