@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bfscale"
-version = "1.0a2"
+version = "1.0a3"
 authors = [
 	{ name="GroveDG", email="grovedgdev@gmail.com"}
 ]

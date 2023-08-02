@@ -59,10 +59,9 @@ def resize(img, scale):
 
 	parameters, _, _, _ = np.linalg.lstsq(yx_indices, data, rcond=None)
 
-	out_img = np.pad(np.clip(parameters, 0, 255).transpose().reshape(out_img_shape), ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values=-1)
+	out_img = np.pad(parameters.transpose().reshape(out_img_shape), ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values=-1)
 	# This ↓↓↓ is what this line ↑↑↑ is doing
 	# ---------------------------------------
-	# out_img = np.clip(parameters, 0, 255)
 	# out_img = out_img.transpose()
 	# out_img = out_img.reshape(out_img_shape)
 	# out_img = np.pad(out_img, ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values=-1)
@@ -75,7 +74,7 @@ def resize(img, scale):
 	out_img[0, 0, :, 3] = -1
 
 	out_img = np.ma.median(np.ma.masked_values(out_img, -1), axis=-1)
-	out_img = np.uint8(np.round(np.ma.getdata(out_img)))
+	out_img = np.uint8(np.clip(np.round(np.ma.getdata(out_img)), 0, 255))
 	return out_img
 
 def _scales_of(size):
