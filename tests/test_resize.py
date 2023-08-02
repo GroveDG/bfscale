@@ -20,7 +20,7 @@ def datadir(tmpdir, request):
 	return tmpdir
 
 def test_resize(datadir):
-	img_test = imread(datadir.join("billiards.png"))
+	img_test = imread(os.path.realpath(datadir.join("billiards.png")))
 	img_test = bf.resize(img_test)
-	img_sample = imread(datadir.join("billiards-scaled.png"))
+	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled.png")))
 	assert img_sample == img_test
