@@ -8,6 +8,7 @@ Bfscale was originally developed for improved Signed Distance Fields (SDFs), but
 ## Dependencies
 <ul>
   <li>Numpy</li>
+  <li>Numba</li>
   <li>ImageIO</li>
   <li>PySimpleGUI</li>
 </ul>
