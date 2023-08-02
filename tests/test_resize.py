@@ -24,5 +24,8 @@ def test_resize(datadir):
 	img_test = imread(os.path.realpath(datadir.join("billiards.tif")))
 	img_test = bf.resize(img_test, 5)
 	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled.tif")))
-	print(np.nonzero(img_sample-img_test))
+	diff = img_sample-img_test
+	print(diff.nonzero())
+	print(diff[diff != 0])
+	print(np.count_nonzero(diff))
 	assert np.all(img_sample == img_test)
