@@ -1,6 +1,7 @@
 import bfscale as bf
 from imageio.v3 import imread
 from pytest import fixture
+from distutils import dir_util
 import os
 
 @fixture
