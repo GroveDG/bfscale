@@ -34,7 +34,7 @@ layout = [[gui.Text("Enter the image you wish to process")],
 # 	return data.transpose()
 
 @njit(parallel=True)
-def flatten_data(data, out_img_shape, img, scale):
+def _flatten_data(data, out_img_shape, img, scale):
 	for y in prange(out_img_shape[0]):
 		y_ind = y * out_img_shape[1] * out_img_shape[2]
 		for x in prange(out_img_shape[1]):
@@ -49,7 +49,7 @@ def resize(img, scale):
 	out_img_shape = (img.shape[0]//scale-1, img.shape[1]//scale-1, img.shape[2], 4)
 
 	data = np.zeros((out_img_shape[0] * out_img_shape[1] * out_img_shape[2], scale ** 2), dtype=np.float32) # Shape: (number of fits, number of points)
-	data = flatten_data(data, out_img_shape, img, scale)
+	data = _flatten_data(data, out_img_shape, img, scale)
 
 	indicies = np.linspace(0, scale, scale+1)[0:-1]
 	X = np.tile(indicies, scale)
@@ -74,42 +74,34 @@ def resize(img, scale):
 	out_img[0, :, :, 2] = -1
 	out_img[0, 0, :, 3] = -1
 
-	return out_img # Not a real image yet
-
-def best_fit(img, scale, SCALE_DEVICE):
-	out_img = None
-
-	match ResizeDevice[SCALE_DEVICE]:
-		case ResizeDevice.CPU_SINGLE:
-			out_img = RESIZE_CPU(img, scale, SCALE_DEVICE)
-
 	out_img = np.ma.median(np.ma.masked_values(out_img, -1), axis=-1)
 	out_img = np.uint8(np.round(np.ma.getdata(out_img)))
 	return out_img
 
-def scales_of(size):
+def _scales_of(size):
 	scales = []
 	for n in range(1, floor(sqrt(size[0]))+1):
 		if size[0] % n == 0 and size[1] % n == 0:
 			scales.append(n)
 	return scales
 
-def update_scale(filepath, scale):
+def _update_scale(window, filepath, scale):
 	size = improps(filepath).shape
 	window['-SIZE-'].update("Final Size: {x}, {y}".format(x = floor(size[0] / scale),y = floor(size[1] / scale)))
 
-def get_available_scales(filepath):
+def _get_available_scales(filepath):
 	size = improps(filepath).shape
-	return scales_of(size)
+	return _scales_of(size)
 
-def write_img(filepath, savename, img):
+def _write_img(filepath, savename, img):
 	savepath = Path(filepath)
 	if savename != "":
 		savepath = savepath.with_stem(savename)
 	imwrite(savepath, img)
 
 # ================== START ================== #
-def main():
+def open_window():
+	window = gui.Window('Best Fit Scale', layout) # Create the window
 
 	prev_filepath = ""
 	while True: # Event loop
@@ -128,24 +120,23 @@ def main():
 					print(e)
 					window['-OUTPUT-'].update('Invalid image: ' + values['-IN_PATH-'])
 					continue
-				out_img = best_fit(img, scale)
-				write_img(filepath, values['-OUT_NAME-'], out_img)
+				out_img = resize(img, scale)
+				_write_img(filepath, values['-OUT_NAME-'], out_img)
 			case '-IN_PATH-':
 				if os.path.exists(filepath):
 					savepath = Path(filepath)
 					window['-OUT_NAME-'].update(savepath.stem + "-scaled")
-					window['-SCALE-'].update(values = get_available_scales(filepath), value = 1)
-					update_scale(filepath, 1)
+					window['-SCALE-'].update(values = _get_available_scales(filepath), value = 1)
+					_update_scale(window, filepath, 1)
 			case '-SCALE-':
-				update_scale(filepath, scale)
+				_update_scale(window, filepath, scale)
 
 		prev_filepath = filepath
 
 	window.close()
 
 if __name__ == '__main__':
-	window = gui.Window('Best Fit Downscale', layout) # Create the window
-	main()
+	open_window()
 
 """
 Copyright (c) 2023 GroveDG
