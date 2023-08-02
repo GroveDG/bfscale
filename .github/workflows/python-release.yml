@@ -23,9 +23,8 @@ jobs:
         pip install build
     - name: Build package
       run: python -m build
-    - name: Upload to release
-      uses: JasonEtco/upload-to-release@master
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
       with:
-        args: dist
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: package
+        path: dist/*
