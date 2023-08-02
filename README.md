@@ -1,6 +1,6 @@
 # bfscale
 
-Best Fit Scale (bfscale) is a image downscaling method to create the highest possible image quality upon upscaling/upsampling with a certain scaling method (in this instance bilinear). This is achieved by curve fitting the sections of the original image that correspond to pixels in the downscaled image.
+Best Fit Scale (bfscale) is a image downscaling method to create the highest possible image quality upon upscaling/upsampling with a certain scaling method (in this instance bilinear). This is achieved by fitting the parameters of the upscaling model to sections of the original image. In the case of bilinear, this can be done with a simple linear regression.
 
 Bfscale was originally developed for improved Signed Distance Fields (SDFs), but was separated due to its broader usefulness.
 
