@@ -2,6 +2,7 @@ import bfscale as bf
 from imageio.v3 import imread
 from pytest import fixture
 from distutils import dir_util
+import numpy as np
 import os
 
 @fixture
@@ -23,4 +24,4 @@ def test_resize(datadir):
 	img_test = imread(os.path.realpath(datadir.join("billiards.png")))
 	img_test = bf.resize(img_test, 5)
 	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled.png")))
-	assert img_sample == img_test
+	assert np.all(img_sample == img_test)
