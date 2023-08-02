@@ -5,6 +5,7 @@ Best Fit Scale (bfscale) is a image downscaling method to create the highest pos
 Bfscale was originally developed for improved Signed Distance Fields (SDFs), but was separated due to its broader usefulness.
 
 Source: https://github.com/GroveDG/bfscale
+
 PyPi: https://pypi.org/project/bfscale
 
 ## Dependencies
