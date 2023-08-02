@@ -21,8 +21,8 @@ def datadir(tmpdir, request):
 	return tmpdir
 
 def test_resize(datadir):
-	img_test = imread(os.path.realpath(datadir.join("billiards.png")))
+	img_test = imread(os.path.realpath(datadir.join("billiards.tif")))
 	img_test = bf.resize(img_test, 5)
-	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled.png")))
+	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled.tif")))
 	print(np.nonzero(img_sample-img_test))
 	assert np.all(img_sample == img_test)
