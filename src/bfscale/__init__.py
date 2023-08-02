@@ -6,22 +6,9 @@ from math import floor, sqrt
 from enum import *
 
 import numpy as np
-from imageio.v3 import imread, imwrite, improps # Image IO
 from numba import njit, prange
-
-class ResizeDevice(Enum):
-	CPU_SINGLE = auto()
-	CPU_MULTI = auto()
-	GPU = auto()
-
-available_devices = [ResizeDevice.CPU_SINGLE]
-# try:
-# 	import pygpufit.gpufit as gf 					# GPU fitting (a fun compile-it-yourself project for the whole family!)
-# 	available_devices.append(ResizeDevice.GPU)
-# except ImportError:
-# 	print('Module "gpufit" not found: GPU unavailable')
-
-import PySimpleGUI as gui 						# GUI
+from imageio.v3 import imread, imwrite, improps
+import PySimpleGUI as gui
 
 # GUI Window Layout
 layout = [[gui.Text("Enter the image you wish to process")],
@@ -30,13 +17,12 @@ layout = [[gui.Text("Enter the image you wish to process")],
 			[gui.Text("Name:", pad=((6,4),(1,5))), gui.Input(key='-OUT_NAME-', size=(10,1), expand_x=True, pad=((0,6),(1,5)))],
 			], expand_x=True)],
 		  [gui.Frame("Scaling", [
-			[gui.Text("Image Downscale:", pad=((6,4),(1,5))), gui.Combo([1], default_value = 1, key='-SCALE-', enable_events=True, pad=((0,6),(1,5))), gui.Text("Final Size:", key='-SIZE-', pad=((6,4),(1,5)))],
-			[gui.Text("Scaling Device:", pad=((6,4),(1,5))), gui.Combo([device.name for device in available_devices], key='-SCALE_DEVICE-', pad=((6,4),(1,5)))]
-			], expand_x=True)],
+			[gui.Text("Image Downscale:", pad=((6,4),(1,5))), gui.Combo([1], default_value = 1, key='-SCALE-', enable_events=True, pad=((0,6),(1,5))), gui.Text("Final Size:", key='-SIZE-', pad=((6,4),(1,5)))],			], expand_x=True)],
 		  [gui.Text(size=(40,1), key='-OUTPUT-')],
 		  [gui.Button('Ok'), gui.Button('Quit')]]
 
 # Better when parallelization is not available (and it's prettier)
+# @njit
 # def flatten_data(data, out_img_shape, img, scale):
 # 	out_img_size = out_img_shape[0] * out_img_shape[1] * out_img_shape[2]
 # 	for ind, coord in enumerate(np.ndindex(out_img_shape[0:3])):
@@ -59,7 +45,7 @@ def flatten_data(data, out_img_shape, img, scale):
 				data[ind] = img_section.flat
 	return data.transpose()
 
-def RESIZE_CPU(img, scale, SCALE_DEVICE):
+def resize(img, scale):
 	out_img_shape = (img.shape[0]//scale-1, img.shape[1]//scale-1, img.shape[2], 4)
 
 	data = np.zeros((out_img_shape[0] * out_img_shape[1] * out_img_shape[2], scale ** 2), dtype=np.float32) # Shape: (number of fits, number of points)
@@ -142,7 +128,7 @@ def main():
 					print(e)
 					window['-OUTPUT-'].update('Invalid image: ' + values['-IN_PATH-'])
 					continue
-				out_img = best_fit(img, scale, values['-SCALE_DEVICE-'])
+				out_img = best_fit(img, scale)
 				write_img(filepath, values['-OUT_NAME-'], out_img)
 			case '-IN_PATH-':
 				if os.path.exists(filepath):

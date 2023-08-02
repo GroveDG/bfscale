@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools", "numba"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bfscale"
+version = "1.0a1"
+authors = [
+	{ name="GroveDG", email="grovedgdev@gmail.com"}
+]
+description = "Best fit image scaling"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+	"Programming Language :: Python :: 3",
+	"License :: OSI Approved :: MIT License",
+	"Operating System :: OS Independent",
+]
+dependencies = [
+	'numba >= 0.50',
+	'numpy >= 1.0',
+	'imageio >= 2.10',
+	'pysimplegui >= 4.0'
+]
+
+[project.urls]
+"Homepage" = "https://github.com/GroveDG/bfscale"
+"Bug Tracker" = "https://github.com/GroveDG/bfscale/issues"

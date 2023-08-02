@@ -1,2 +1,4 @@
 _test
 __pycache__
+dist
+src/bfscale.egg-info
