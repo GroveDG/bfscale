@@ -23,8 +23,7 @@ jobs:
         pip install build
     - name: Build package
       run: python -m build
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v3
+    - name: Release
+      uses: softprops/action-gh-release@v1
       with:
-        name: package
-        path: dist/*
+        files: dist
