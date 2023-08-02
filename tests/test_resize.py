@@ -27,5 +27,7 @@ def test_resize(datadir):
 	diff = img_sample-img_test
 	print(diff.nonzero())
 	print(diff[diff != 0])
+	print(img_test[diff != 0])
+	print(img_sample[diff != 0])
 	print(np.count_nonzero(diff))
 	assert np.all(img_sample == img_test)
