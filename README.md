@@ -11,24 +11,12 @@ PyPi: https://pypi.org/project/bfscale
 ## Dependencies
 <ul>
   <li>Numpy</li>
-  <li>Numba</li>
-  <li>ImageIO</li>
-  <li>PySimpleGUI</li>
 </ul>
 
 ## How to Use
-bfscale only has two functions: **bfscale.open_window()** and **bfscale.resize(img, scale)**.
+bfscale only has one function: **bfscale.resize(img, scale)**.
 <ul>
-  <li>open_window()
-    <ul>
-      <li>Opens a gui prompt allowing you to resize images and save them directly to disk.</li>
-    </ul>
-  </li>
-  <li>resize(img, scale)
-    <ul>
-      <li>Resizes the image directly and returns an image downscaled by a factor of scale. Images returned through resize() are numpy arrays in the same format as ImageIO and most other python image processing modules.</li>
-    </ul>
-  </li>
+  <li>Returns an numpy image downscaled by a factor of scale, which must be an integer factor of the image shape.</li>
 </ul>
 
 ## Image Comparison

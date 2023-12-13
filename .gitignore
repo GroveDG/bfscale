@@ -2,3 +2,5 @@ _test
 __pycache__
 dist
 src/bfscale.egg-info
+venv
+manual_test.py

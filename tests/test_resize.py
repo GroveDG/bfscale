@@ -1,4 +1,4 @@
-import bfscale as bf
+import bfscale
 from imageio.v3 import imread
 from pytest import fixture
 from distutils import dir_util
@@ -8,6 +8,7 @@ import os
 @fixture
 def datadir(tmpdir, request):
 	'''
+	https://stackoverflow.com/a/29631801
 	Fixture responsible for searching a folder with the same name of test
 	module and, if available, moving all contents to a temporary directory so
 	tests can use them freely.
@@ -20,9 +21,9 @@ def datadir(tmpdir, request):
 
 	return tmpdir
 
-def test_resize(datadir):
+def test_resize(datadir: str):
 	img_test = imread(os.path.realpath(datadir.join("billiards.tif")))
-	img_test = bf.resize(img_test, 5)
+	img_test = bfscale.scale(img_test, 5)
 	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled.tif")))
 	diff = np.intc(img_sample)-np.intc(img_test)
 	print(diff.nonzero())
