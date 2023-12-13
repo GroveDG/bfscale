@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.5.4", "3.12.1"]
+        python-version: ["3.9", "3.12.1"]
 
     steps:
     - uses: actions/checkout@v3
@@ -28,6 +28,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install -e .[dev]
     - name: Lint with flake8
       run: |
