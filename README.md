@@ -14,7 +14,7 @@ PyPi: https://pypi.org/project/bfscale
 </ul>
 
 ## How to Use
-bfscale only has one function: **bfscale.resize(img, scale)**.
+bfscale only has one function: **bfscale.scale(img, scale)**.
 <ul>
   <li>Returns an numpy image downscaled by a factor of scale, which must be an integer factor of the image shape.</li>
 </ul>
