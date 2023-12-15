@@ -1,21 +1,45 @@
 # Copyright at end of file.
 
-from math import floor, sqrt
+from math import floor, ceil, modf
 import numpy as np
+from itertools import pairwise
+
+from typing import SupportsIndex
+from numpy.typing import ArrayLike
+def _non_integer_array_split(ary: ArrayLike, sections: int, axis: SupportsIndex):
+	split = []
+	ary = ary.swapaxes(axis, 0)
+	for i, j in pairwise(np.linspace(0, ary.shape[0], sections+1)):
+		split.append(ary[ceil(i):floor(j)])
+		if not i.is_integer():
+			t, i = modf(i)
+			i = int(i)
+			interp = ary[[i]]*(1-t) + ary[[i+1]]*t
+			split[-1] = np.concatenate((interp, split[-1]), axis=0)
+		if not j.is_integer():
+			t, j = modf(j)
+			j = int(j)
+			interp = ary[[j]]*(1-t) + ary[[j+1]]*t
+			split[-1] = np.concatenate((split[-1], interp), axis=0)
+		split[-1] = split[-1].swapaxes(axis, 0)
+	return split
 
 def scale(img: np.ndarray, scale: int):
-	if img.shape[0] % scale != 0 or img.shape[1] % scale != 0:
-		raise ValueError(f"Scale ({scale}) is not an integer factor of image shape ({img.shape})")
-
 	# Split image into chunks of size: scale by scale
-	data = np.concatenate(np.array_split(img, img.shape[1]//scale, axis=1), axis=-1)
-	data = np.concatenate(np.array_split(data, img.shape[0]//scale, axis=0), axis=-1)
-	data = data.reshape(scale ** 2, -1)
+	data = []
+	data = np.concatenate(_non_integer_array_split(img, sections=round(img.shape[1]/scale), axis=1), axis=-1)
+	data = np.concatenate(_non_integer_array_split(data, sections=round(img.shape[0]/scale), axis=0), axis=-1)
+	scale_y = scale
+	scale_x = scale
+	if img.shape[0] % scale != 0:
+		scale_y += 1
+	if img.shape[1] % scale != 0:
+		scale_x += 1
+	data = data.reshape(scale_y*scale_x, -1)
 
 	# Create indices for fitting
-	indices = np.linspace(0, scale, scale+1)[0:-1]
-	X = np.tile(indices, scale)
-	Y = np.repeat(indices, scale)
+	X = np.tile(np.linspace(0, scale_x, scale_x), scale_y)
+	Y = np.repeat(np.linspace(0, scale_y, scale_y), scale_x)
 	yx_indices = np.column_stack(((1-Y)*(1-X), (1-X)*Y, X*(1-Y), X*Y))
 
 	# Fit the data
