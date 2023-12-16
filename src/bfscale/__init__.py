@@ -45,10 +45,10 @@ def _divvy_up_by_shape(data: list[np.ndarray], img_size: Tuple[int, int, int], t
 
 def scale(img: np.ndarray, target_size: Tuple[int, int]):
 	"""
-	Scales an image as a numpy array with dimension order (y, x, c) to a size of (target_size[0], target_size[1], c).
+	Scales an image with dimension order (y, x, c) to a size of (target_size[0], target_size[1], c).
 	"""
-	assert target_size[0] <= img.shape[0], ValueError("Target size must be less than image size")
-	assert target_size[1] <= img.shape[1], ValueError("Target size must be less than image size")
+	assert target_size[0] > 1 and target_size[1] > 1, ValueError(f"Target size {target_size} must be greater than 1 in both dimensions. Consider using a size of 2 and averaging the result.")
+	assert target_size[0] <= img.shape[0] and target_size[1] <= img.shape[1], ValueError(f"Target size {target_size} must be less than or equal to image size {img.shape[:2]} in both dimensions.")
 
 	# Split image into chunks of size: scale by scale
 	target_size = (target_size[0]-1, target_size[1]-1)
@@ -94,10 +94,11 @@ def scale(img: np.ndarray, target_size: Tuple[int, int]):
 	out_img = data.reshape(target_size[0], target_size[1], img.shape[2], 4)
 	out_img = np.pad(out_img, ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values=-1)
 
-	# Shift to compensate for edge pixels
+	# Shift parameters to the pixel they belong to
 	out_img[:, 1:, :, 1] = out_img[:, :-1, :, 1]
 	out_img[1:, :, :, 2] = out_img[:-1, :, :, 2]
 	out_img[1:, 1:, :, 3] = out_img[:-1, :-1, :, 3]
+	# Mask areas that parameters aren't shifted to
 	out_img[:, 0, :, 1] = -1
 	out_img[0, :, :, 2] = -1
 	out_img[0, 0, :, 3] = -1

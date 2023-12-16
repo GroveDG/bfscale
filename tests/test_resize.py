@@ -39,3 +39,9 @@ def test_resize(datadir: str):
 	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled1199.tif")))
 	diff = np.intc(img_sample)-np.intc(img_test)
 	assert np.all(abs(diff) <= 1)
+
+	img = imread('imageio:coffee.png')
+	scaled_img = bfscale.scale(img, (200,300))
+	img_sample = imread(os.path.realpath(datadir.join("coffee-scaled.tif")))
+	diff = np.intc(img_sample)-np.intc(img_test)
+	assert np.all(abs(diff) <= 1)
