@@ -1,8 +1,16 @@
 # Copyright at end of file.
 from math import floor, ceil
 import numpy as np
-from itertools import pairwise, product
-from matplotlib import pyplot as plt
+from itertools import product
+try:
+	from itertools import pairwise
+except:
+	from itertools import tee
+	def pairwise(iterable):
+		"s -> (s0,s1), (s1,s2), (s2, s3), ..."
+		a, b = tee(iterable)
+		next(b, None)
+		return zip(a, b)
 
 from typing import Tuple
 def _create_yx_indices(shape: Tuple[int, int]):
