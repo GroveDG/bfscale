@@ -7,15 +7,17 @@ try:
 except:
 	from itertools import tee
 	def pairwise(iterable):
-		"s -> (s0,s1), (s1,s2), (s2, s3), ..."
 		a, b = tee(iterable)
 		next(b, None)
 		return zip(a, b)
 
 from typing import Tuple
 def _create_yx_indices(shape: Tuple[int, int]):
-	X = np.tile(np.linspace(0, shape[1], shape[1]), shape[0])
-	Y = np.repeat(np.linspace(0, shape[0], shape[0]), shape[1])
+	X = np.tile(np.linspace(0, 1, shape[1]), shape[0])
+	Y = np.repeat(np.linspace(0, 1, shape[0]), shape[1])
+	# Calculate for the influence of each vertex in a bilinear interpolation.     0  |  2
+	# Each column contains a 2d array of they weights which are then used in    -----+-----
+	# np.lstsq where the lstsq solution is calculated for each set of weights.    1  |  3
 	yx_indices = np.column_stack(((1-Y)*(1-X), (1-X)*Y, X*(1-Y), X*Y))
 	return yx_indices
 
@@ -42,8 +44,11 @@ def _divvy_up_by_shape(data: list[np.ndarray], img_size: Tuple[int, int, int], t
 
 
 def scale(img: np.ndarray, target_size: Tuple[int, int]):
-	assert target_size[0] < img.shape[0], ValueError("Target size must be less than image size")
-	assert target_size[1] < img.shape[1], ValueError("Target size must be less than image size")
+	"""
+	Scales an image with dimension order (y, x, c) to a size of (target_size[0], target_size[1], c).
+	"""
+	assert target_size[0] > 1 and target_size[1] > 1, ValueError(f"Target size {target_size} must be greater than 1 in both dimensions. Consider using a size of 2 and averaging the result.")
+	assert target_size[0] <= img.shape[0] and target_size[1] <= img.shape[1], ValueError(f"Target size {target_size} must be less than or equal to image size {img.shape[:2]} in both dimensions.")
 
 	# Split image into chunks of size: scale by scale
 	target_size = (target_size[0]-1, target_size[1]-1)
@@ -65,14 +70,21 @@ def scale(img: np.ndarray, target_size: Tuple[int, int]):
 	for yx_indices, chunks, chunk_shape in zip(all_yx_indices, all_chunks, chunk_mapping.keys()):
 		if chunk_shape[0] == 1 and chunk_shape[1] == 1:
 			parameters = chunks.repeat(4, 0)
+			parameters = parameters.T
 		else:
 			parameters, _, _, _ = np.linalg.lstsq(yx_indices, chunks, rcond=None)
+			parameters = parameters.T
 			if chunk_shape[0] == 1:
-				parameters = np.tile(chunks, (2, 1))
+				if parameters.shape[1] == 2:
+					parameters = np.repeat(chunks, 2, axis=1)
+				else:
+					parameters[:, 1::2] = parameters[:, 0::2]
 			if chunk_shape[1] == 1:
-				parameters = chunks.repeat(2, 0)
-		all_parameters.append(parameters.T)
-		
+				if parameters.shape[1] == 2:
+					parameters = np.tile(chunks, (1, 2))
+				else:
+					parameters[:, 2:] = parameters[:, :2]
+		all_parameters.append(parameters)
 
 	# Reshape fit result parameters into image
 	for i, parameters in enumerate(all_parameters):
@@ -82,12 +94,13 @@ def scale(img: np.ndarray, target_size: Tuple[int, int]):
 	out_img = data.reshape(target_size[0], target_size[1], img.shape[2], 4)
 	out_img = np.pad(out_img, ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values=-1)
 
-	# Shift to compensate for edge pixels
-	out_img[:, 1:, :, 1] = out_img[:, :-1, :, 1]
-	out_img[1:, :, :, 2] = out_img[:-1, :, :, 2]
+	# Shift parameters to the pixel they belong to
+	out_img[1:, :, :, 1] = out_img[:-1, :, :, 1]
+	out_img[:, :-1, :, 2] = out_img[:, :-1, :, 2]
 	out_img[1:, 1:, :, 3] = out_img[:-1, :-1, :, 3]
-	out_img[:, 0, :, 1] = -1
-	out_img[0, :, :, 2] = -1
+	# Mask areas that parameters aren't shifted to
+	out_img[0, :, :, 1] = -1
+	out_img[:, 0, :, 2] = -1
 	out_img[0, 0, :, 3] = -1
 
 	# Combine result parameters of each chunk

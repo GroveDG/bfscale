@@ -4,3 +4,4 @@ dist
 src/bfscale.egg-info
 venv
 manual_test.py
+tests/test_resize/2eLRf6q.png

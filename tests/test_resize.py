@@ -22,20 +22,29 @@ def datadir(tmpdir, request):
 	return tmpdir
 
 def test_resize(datadir: str):
-	img_test = imread(os.path.realpath(datadir.join("billiards.tif")))
-	img_test = bfscale.scale(img_test, (2, 2))
-	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled2.tif")))
+	img = imread(os.path.realpath(datadir.join("billiards.tif")))
+	img_test = bfscale.scale(img, (2, 2))
+	img_sample = imread(os.path.realpath(datadir.join("billiards-smallest.tif")))
 	diff = np.intc(img_sample)-np.intc(img_test)
 	assert np.all(abs(diff) <= 1)
 
-	img_test = imread(os.path.realpath(datadir.join("billiards.tif")))
-	img_test = bfscale.scale(img_test, (240, 240))
-	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled240.tif")))
+	img_test = bfscale.scale(img, (240, 240))
+	img_sample = imread(os.path.realpath(datadir.join("billiards-normal.tif")))
 	diff = np.intc(img_sample)-np.intc(img_test)
 	assert np.all(abs(diff) <= 1)
 	
-	img_test = imread(os.path.realpath(datadir.join("billiards.tif")))
-	img_test = bfscale.scale(img_test, (1199, 1199))
-	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled1199.tif")))
+	img_test = bfscale.scale(img, (1199, 1199))
+	img_sample = imread(os.path.realpath(datadir.join("billiards-largest.tif")))
+	diff = np.intc(img_sample)-np.intc(img_test)
+	assert np.all(abs(diff) <= 1)
+
+	img = imread('imageio:coffee.png')
+	img_test = bfscale.scale(img, (200,300))
+	img_sample = imread(os.path.realpath(datadir.join("coffee-rectangle.tif")))
+	diff = np.intc(img_sample)-np.intc(img_test)
+	assert np.all(abs(diff) <= 1)
+
+	img_test = bfscale.scale(img, (300,200))
+	img_sample = imread(os.path.realpath(datadir.join("coffee-squish.tif")))
 	diff = np.intc(img_sample)-np.intc(img_test)
 	assert np.all(abs(diff) <= 1)
