@@ -7,15 +7,17 @@ try:
 except:
 	from itertools import tee
 	def pairwise(iterable):
-		"s -> (s0,s1), (s1,s2), (s2, s3), ..."
 		a, b = tee(iterable)
 		next(b, None)
 		return zip(a, b)
 
 from typing import Tuple
 def _create_yx_indices(shape: Tuple[int, int]):
-	X = np.tile(np.linspace(0, shape[1], shape[1]), shape[0])
-	Y = np.repeat(np.linspace(0, shape[0], shape[0]), shape[1])
+	X = np.tile(np.linspace(0, 1, shape[1]), shape[0])
+	Y = np.repeat(np.linspace(0, 1, shape[0]), shape[1])
+	# Calculate for the influence of each vertex in a bilinear interpolation.     0  |  2
+	# Each column contains a 2d array of they weights which are then used in    -----+-----
+	# np.lstsq where the lstsq solution is calculated for each set of weights.    1  |  3
 	yx_indices = np.column_stack(((1-Y)*(1-X), (1-X)*Y, X*(1-Y), X*Y))
 	return yx_indices
 
@@ -42,6 +44,9 @@ def _divvy_up_by_shape(data: list[np.ndarray], img_size: Tuple[int, int, int], t
 
 
 def scale(img: np.ndarray, target_size: Tuple[int, int]):
+	"""
+	Scales an image as a numpy array with dimension order (y, x, c) to a size of (target_size[0], target_size[1], c).
+	"""
 	assert target_size[0] < img.shape[0], ValueError("Target size must be less than image size")
 	assert target_size[1] < img.shape[1], ValueError("Target size must be less than image size")
 
@@ -66,13 +71,20 @@ def scale(img: np.ndarray, target_size: Tuple[int, int]):
 		if chunk_shape[0] == 1 and chunk_shape[1] == 1:
 			parameters = chunks.repeat(4, 0)
 		else:
-			parameters, _, _, _ = np.linalg.lstsq(yx_indices, chunks, rcond=None)
+			parameters, res, rank, s = np.linalg.lstsq(yx_indices, chunks, rcond=None)
+			parameters = parameters.T
 			if chunk_shape[0] == 1:
-				parameters = np.tile(chunks, (2, 1))
+				if parameters.shape[1] == 2:
+					parameters = np.repeat(chunks, 2, axis=1)
+				else:
+					parameters[:, 1::2] = parameters[:, 0::2]
+				print(0)
 			if chunk_shape[1] == 1:
-				parameters = chunks.repeat(2, 0)
-		all_parameters.append(parameters.T)
-		
+				if parameters.shape[1] == 2:
+					parameters = np.tile(chunks, (1, 2))
+				else:
+					parameters[:, 2:] = parameters[:, :2]
+		all_parameters.append(parameters)
 
 	# Reshape fit result parameters into image
 	for i, parameters in enumerate(all_parameters):
