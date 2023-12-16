@@ -47,8 +47,8 @@ def scale(img: np.ndarray, target_size: Tuple[int, int]):
 	"""
 	Scales an image as a numpy array with dimension order (y, x, c) to a size of (target_size[0], target_size[1], c).
 	"""
-	assert target_size[0] < img.shape[0], ValueError("Target size must be less than image size")
-	assert target_size[1] < img.shape[1], ValueError("Target size must be less than image size")
+	assert target_size[0] <= img.shape[0], ValueError("Target size must be less than image size")
+	assert target_size[1] <= img.shape[1], ValueError("Target size must be less than image size")
 
 	# Split image into chunks of size: scale by scale
 	target_size = (target_size[0]-1, target_size[1]-1)
