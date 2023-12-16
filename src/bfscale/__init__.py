@@ -1,29 +1,85 @@
 # Copyright at end of file.
-
-from math import floor, sqrt
+from math import floor, ceil
 import numpy as np
+from itertools import product
+try:
+	from itertools import pairwise
+except:
+	from itertools import tee
+	def pairwise(iterable):
+		"s -> (s0,s1), (s1,s2), (s2, s3), ..."
+		a, b = tee(iterable)
+		next(b, None)
+		return zip(a, b)
 
-def scale(img: np.ndarray, scale: int):
-	if img.shape[0] % scale != 0 or img.shape[1] % scale != 0:
-		raise ValueError(f"Scale ({scale}) is not an integer factor of image shape ({img.shape})")
+from typing import Tuple
+def _create_yx_indices(shape: Tuple[int, int]):
+	X = np.tile(np.linspace(0, shape[1], shape[1]), shape[0])
+	Y = np.repeat(np.linspace(0, shape[0], shape[0]), shape[1])
+	yx_indices = np.column_stack(((1-Y)*(1-X), (1-X)*Y, X*(1-Y), X*Y))
+	return yx_indices
+
+def _divvy_up_by_shape(data: list[np.ndarray], img_size: Tuple[int, int, int], target_size: Tuple[int, int]):
+	chunk_mapping = {
+		(floor(img_size[0]/target_size[0]), floor(img_size[1]/target_size[1]), img_size[2]),
+		(floor(img_size[0]/target_size[0]), ceil(img_size[1]/target_size[1]), img_size[2]),
+		(ceil(img_size[0]/target_size[0]), floor(img_size[1]/target_size[1]), img_size[2]),
+		(ceil(img_size[0]/target_size[0]), ceil(img_size[1]/target_size[1]), img_size[2])
+	}
+	num_shapes = len(chunk_mapping)
+	chunk_mapping = {shape: i for i, shape in enumerate(chunk_mapping)}
+	all_chunks = [[] for _ in range(num_shapes)]
+	inverse = []
+	if num_shapes == 1:
+		all_chunks[0] = data
+		inverse = [0] * len(data)
+	else:
+		for chunk in data:
+			chunk_shape_ind = chunk_mapping[chunk.shape]
+			all_chunks[chunk_shape_ind].append(chunk)
+			inverse.append(chunk_shape_ind)
+	return all_chunks, chunk_mapping, inverse
+
+
+def scale(img: np.ndarray, target_size: Tuple[int, int]):
+	assert target_size[0] < img.shape[0], ValueError("Target size must be less than image size")
+	assert target_size[1] < img.shape[1], ValueError("Target size must be less than image size")
 
 	# Split image into chunks of size: scale by scale
-	data = np.concatenate(np.array_split(img, img.shape[1]//scale, axis=1), axis=-1)
-	data = np.concatenate(np.array_split(data, img.shape[0]//scale, axis=0), axis=-1)
-	data = data.reshape(scale ** 2, -1)
+	target_size = (target_size[0]-1, target_size[1]-1)
+	indices_y = np.round(np.linspace(0, img.shape[0], target_size[0]+1)).astype(np.int16)
+	indices_x = np.round(np.linspace(0, img.shape[1], target_size[1]+1)).astype(np.int16)
+	indices_x = [slice(i,j) for i, j in pairwise(indices_x)]
+	indices_y = [slice(i,j) for i, j in pairwise(indices_y)]
+	data = [img[slice_y, slice_x] for slice_y, slice_x in product(reversed(indices_y), reversed(indices_x))]
 
+	# Separate out chunks by size
+	all_chunks, chunk_mapping, inverse = _divvy_up_by_shape(data, img.shape, target_size)
+	all_chunks = [np.concatenate(chunks, axis=-1).reshape(shape[0]*shape[1], -1) for chunks, shape in zip(all_chunks, chunk_mapping.keys())]
+	
 	# Create indices for fitting
-	indices = np.linspace(0, scale, scale+1)[0:-1]
-	X = np.tile(indices, scale)
-	Y = np.repeat(indices, scale)
-	yx_indices = np.column_stack(((1-Y)*(1-X), (1-X)*Y, X*(1-Y), X*Y))
+	all_yx_indices = [_create_yx_indices(shape) for shape in chunk_mapping.keys()]
 
 	# Fit the data
-	parameters, _, _, _ = np.linalg.lstsq(yx_indices, data, rcond=None)
+	all_parameters = []
+	for yx_indices, chunks, chunk_shape in zip(all_yx_indices, all_chunks, chunk_mapping.keys()):
+		if chunk_shape[0] == 1 and chunk_shape[1] == 1:
+			parameters = chunks.repeat(4, 0)
+		else:
+			parameters, _, _, _ = np.linalg.lstsq(yx_indices, chunks, rcond=None)
+			if chunk_shape[0] == 1:
+				parameters = np.tile(chunks, (2, 1))
+			if chunk_shape[1] == 1:
+				parameters = chunks.repeat(2, 0)
+		all_parameters.append(parameters.T)
+		
 
 	# Reshape fit result parameters into image
-	out_img = parameters.T
-	out_img = out_img.reshape(img.shape[0]//scale, img.shape[1]//scale, img.shape[2], 4)
+	for i, parameters in enumerate(all_parameters):
+		all_parameters[i] = np.split(parameters, parameters.shape[0]//img.shape[2], axis=0)
+	data = [all_parameters[chunk_shape_ind].pop(-1) for chunk_shape_ind in inverse]
+	data = np.stack(data, axis=0)
+	out_img = data.reshape(target_size[0], target_size[1], img.shape[2], 4)
 	out_img = np.pad(out_img, ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values=-1)
 
 	# Shift to compensate for edge pixels
@@ -38,7 +94,7 @@ def scale(img: np.ndarray, scale: int):
 	out_img = np.ma.median(np.ma.masked_values(out_img, -1), axis=-1)
 	out_img = np.ma.getdata(out_img)
 
-	# Convert to img dtype
+	# Convert output to original image dtype
 	if issubclass(img.dtype.type, np.integer):
 		dtype_min = np.iinfo(img.dtype).min
 		dtype_max = np.iinfo(img.dtype).max

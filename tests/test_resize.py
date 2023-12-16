@@ -23,11 +23,19 @@ def datadir(tmpdir, request):
 
 def test_resize(datadir: str):
 	img_test = imread(os.path.realpath(datadir.join("billiards.tif")))
-	img_test = bfscale.scale(img_test, 5)
-	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled.tif")))
+	img_test = bfscale.scale(img_test, (2, 2))
+	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled2.tif")))
 	diff = np.intc(img_sample)-np.intc(img_test)
-	print(diff.nonzero())
-	print(diff[diff > 1])
-	print(img_test[diff > 1])
-	print(img_sample[diff > 1])
+	assert np.all(abs(diff) <= 1)
+
+	img_test = imread(os.path.realpath(datadir.join("billiards.tif")))
+	img_test = bfscale.scale(img_test, (240, 240))
+	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled240.tif")))
+	diff = np.intc(img_sample)-np.intc(img_test)
+	assert np.all(abs(diff) <= 1)
+	
+	img_test = imread(os.path.realpath(datadir.join("billiards.tif")))
+	img_test = bfscale.scale(img_test, (1199, 1199))
+	img_sample = imread(os.path.realpath(datadir.join("billiards-scaled1199.tif")))
+	diff = np.intc(img_sample)-np.intc(img_test)
 	assert np.all(abs(diff) <= 1)
