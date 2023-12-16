@@ -95,12 +95,12 @@ def scale(img: np.ndarray, target_size: Tuple[int, int]):
 	out_img = np.pad(out_img, ((0,1), (0,1), (0,0), (0,0)), 'constant', constant_values=-1)
 
 	# Shift parameters to the pixel they belong to
-	out_img[:, 1:, :, 1] = out_img[:, :-1, :, 1]
-	out_img[1:, :, :, 2] = out_img[:-1, :, :, 2]
+	out_img[1:, :, :, 1] = out_img[:-1, :, :, 1]
+	out_img[:, :-1, :, 2] = out_img[:, :-1, :, 2]
 	out_img[1:, 1:, :, 3] = out_img[:-1, :-1, :, 3]
 	# Mask areas that parameters aren't shifted to
-	out_img[:, 0, :, 1] = -1
-	out_img[0, :, :, 2] = -1
+	out_img[0, :, :, 1] = -1
+	out_img[:, 0, :, 2] = -1
 	out_img[0, 0, :, 3] = -1
 
 	# Combine result parameters of each chunk
