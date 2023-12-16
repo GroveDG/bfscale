@@ -1,8 +1,8 @@
 # Copyright at end of file.
-
-from math import floor, ceil, modf
+from math import floor, ceil
 import numpy as np
 from itertools import pairwise, product
+from matplotlib import pyplot as plt
 
 from typing import Tuple
 def _create_yx_indices(shape: Tuple[int, int]):
@@ -54,9 +54,17 @@ def scale(img: np.ndarray, target_size: Tuple[int, int]):
 
 	# Fit the data
 	all_parameters = []
-	for yx_indices, chunks in zip(all_yx_indices, all_chunks):
-		parameters, _, _, _ = np.linalg.lstsq(yx_indices, chunks, rcond=None)
+	for yx_indices, chunks, chunk_shape in zip(all_yx_indices, all_chunks, chunk_mapping.keys()):
+		if chunk_shape[0] == 1 and chunk_shape[1] == 1:
+			parameters = chunks.repeat(4, 0)
+		else:
+			parameters, _, _, _ = np.linalg.lstsq(yx_indices, chunks, rcond=None)
+			if chunk_shape[0] == 1:
+				parameters = np.tile(chunks, (2, 1))
+			if chunk_shape[1] == 1:
+				parameters = chunks.repeat(2, 0)
 		all_parameters.append(parameters.T)
+		
 
 	# Reshape fit result parameters into image
 	for i, parameters in enumerate(all_parameters):
