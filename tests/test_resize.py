@@ -41,7 +41,12 @@ def test_resize(datadir: str):
 	assert np.all(abs(diff) <= 1)
 
 	img = imread('imageio:coffee.png')
-	scaled_img = bfscale.scale(img, (200,300))
-	img_sample = imread(os.path.realpath(datadir.join("coffee-scaled.tif")))
+	img_test = bfscale.scale(img, (200,300))
+	img_sample = imread(os.path.realpath(datadir.join("coffee-scaled-rectangle.tif")))
+	diff = np.intc(img_sample)-np.intc(img_test)
+	assert np.all(abs(diff) <= 1)
+
+	img_test = bfscale.scale(img, (300,200))
+	img_sample = imread(os.path.realpath(datadir.join("coffee-scaled-squish.tif")))
 	diff = np.intc(img_sample)-np.intc(img_test)
 	assert np.all(abs(diff) <= 1)

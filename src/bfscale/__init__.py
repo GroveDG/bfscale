@@ -70,15 +70,15 @@ def scale(img: np.ndarray, target_size: Tuple[int, int]):
 	for yx_indices, chunks, chunk_shape in zip(all_yx_indices, all_chunks, chunk_mapping.keys()):
 		if chunk_shape[0] == 1 and chunk_shape[1] == 1:
 			parameters = chunks.repeat(4, 0)
+			parameters = parameters.T
 		else:
-			parameters, res, rank, s = np.linalg.lstsq(yx_indices, chunks, rcond=None)
+			parameters, _, _, _ = np.linalg.lstsq(yx_indices, chunks, rcond=None)
 			parameters = parameters.T
 			if chunk_shape[0] == 1:
 				if parameters.shape[1] == 2:
 					parameters = np.repeat(chunks, 2, axis=1)
 				else:
 					parameters[:, 1::2] = parameters[:, 0::2]
-				print(0)
 			if chunk_shape[1] == 1:
 				if parameters.shape[1] == 2:
 					parameters = np.tile(chunks, (1, 2))
